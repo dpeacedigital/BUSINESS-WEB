@@ -2,7 +2,38 @@ const express = require('express');
 const methodOverride = require('method-override');
 const path = require('path');
 require('dotenv').config();
+// Automatically create tables on startup if they don't exist
+async function initDB() {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS products (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        sku VARCHAR(100) UNIQUE,
+        category VARCHAR(100),
+        cost_price NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
+        selling_price NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
+        stock_quantity INTEGER NOT NULL DEFAULT 0,
+        low_stock_threshold INTEGER NOT NULL DEFAULT 5,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
 
+      CREATE TABLE IF NOT EXISTS sales (
+        id SERIAL PRIMARY KEY,
+        product_id INTEGER REFERENCES products(id) ON DELETE CASCADE,
+        quantity_sold INTEGER NOT NULL,
+        selling_price NUMERIC(10, 2) NOT NULL,
+        total_amount NUMERIC(10, 2) NOT NULL,
+        sold_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+    console.log('Database tables verified / created successfully!');
+  } catch (err) {
+    console.error('Error creating tables:', err);
+  }
+}
+initDB();
 const pool = require('./config/db');
 
 const app = express();
