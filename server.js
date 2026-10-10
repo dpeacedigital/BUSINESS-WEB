@@ -2,7 +2,14 @@ const express = require('express');
 const methodOverride = require('method-override');
 const path = require('path');
 require('dotenv').config();
-// Automatically create tables on startup if they don't exist
+
+// 1. Initialize pool first
+const pool = require('./config/db');
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// 2. Automatically verify or create tables
 async function initDB() {
   try {
     await pool.query(`
@@ -30,14 +37,10 @@ async function initDB() {
     `);
     console.log('Database tables verified / created successfully!');
   } catch (err) {
-    console.error('Error creating tables:', err);
+    console.error('Database connection / setup notice:', err.message);
   }
 }
 initDB();
-const pool = require('./config/db');
-
-const app = express();
-const PORT = process.env.PORT || 3000;
 
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, 'views'));
@@ -47,7 +50,7 @@ app.use(express.json());
 app.use(methodOverride('_method'));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Dashboard route: view all products, total inventory value, low-stock warnings
+// Dashboard route
 app.get('/', async (req, res) => {
   try {
     const searchQuery = req.query.search || '';
@@ -61,7 +64,6 @@ app.get('/', async (req, res) => {
 
     const { rows: products } = await pool.query(productQuery, params);
 
-    // Calculate metrics
     const totalProducts = products.length;
     const totalInventoryValue = products.reduce((acc, p) => acc + (parseFloat(p.selling_price) * parseInt(p.stock_quantity)), 0);
     const lowStockItems = products.filter(p => p.stock_quantity <= p.low_stock_threshold);
@@ -74,7 +76,7 @@ app.get('/', async (req, res) => {
       lowStockCount: lowStockItems.length
     });
   } catch (err) {
-    console.error(err);
+    console.error('Route error:', err);
     res.status(500).send('Database Error');
   }
 });
@@ -95,7 +97,7 @@ app.post('/products', async (req, res) => {
   }
 });
 
-// Record a sale (reduces stock)
+// Record a sale
 app.post('/sales', async (req, res) => {
   const { product_id, quantity_sold } = req.body;
   const qty = parseInt(quantity_sold);
